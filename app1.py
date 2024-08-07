@@ -45,12 +45,10 @@ def load_data(filename):
     return df
 
 # Function to get data for selected date range
-# Function to get data for selected date range
 def filter_date_range(df, start_date, end_date):
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     return df[(df['Activity Date'] >= start_date) & (df['Activity Date'] <= end_date)]
-
 
 # Function to calculate summary statistics
 def calculate_summary(df):
@@ -110,7 +108,7 @@ def main():
     df = load_data(filename)
 
     # Sidebar options
-    dashboard_options = ['Summary', 'Filter Data', 'BDE level Dashboard', 'FPO level Dashboard', 'Activity level Dashboard']
+    dashboard_options = ['Summary', 'Detailed Overview']
     selected_dashboard = st.sidebar.radio("Select Dashboard", dashboard_options)
 
     if selected_dashboard == 'Summary':
@@ -145,209 +143,147 @@ def main():
 
         st.metric("Best BDE", comparison['Best BDE'])
 
+    elif selected_dashboard == 'Detailed Overview':
+        st.subheader('Detailed Overview')
+        dashboard_type = st.selectbox('Select Dashboard Type:', ['BDE level Dashboard', 'FPO level Dashboard', 'Activity level Dashboard'])
 
-    elif selected_dashboard == 'Filter Data':
-        # Filter data by date, date range, or month and compare
-        st.subheader('Filter Data')
-        filter_type = st.radio('Filter Data By:', ('Date', 'Date Range', 'Month'))
+        # Filter data by date range
+        filter_type = st.radio('Filter Data By:', ('Date', 'Date Range', 'Month', 'All Dates'))
 
-        if filter_type == 'Date':
-            selected_date = st.date_input('Select Date:')
-            filtered_data = df[df['Activity Date'].dt.date == selected_date]
-            compare_date = st.date_input('Compare with Date:')
-            compare_data = df[df['Activity Date'].dt.date == compare_date]
-        elif filter_type == 'Date Range':
-            start_date = st.date_input('Select Start Date:')
-            end_date = st.date_input('Select End Date:')
-            filtered_data = filter_date_range(df, start_date, end_date)
-            compare_start_date = st.date_input('Compare with Start Date:')
-            compare_end_date = st.date_input('Compare with End Date:')
-            compare_data = filter_date_range(df, compare_start_date, compare_end_date)
-        else:
-            selected_month = st.selectbox('Select Month:', sorted(df['Activity Date'].dt.month.unique()))
-            filtered_data = df[df['Activity Date'].dt.month == selected_month]
-            compare_month = st.selectbox('Compare with Month:', sorted(df['Activity Date'].dt.month.unique()))
-            compare_data = df[df['Activity Date'].dt.month == compare_month]
+        if dashboard_type == 'BDE level Dashboard':
+            st.subheader('BDE Name Dashboard')
+            selected_bde = st.selectbox('Select BDE Name:', ['All'] + list(df['BDE Name'].unique()))
+            if selected_bde != 'All':
+                bde_data = df[df['BDE Name'] == selected_bde]
+            else:
+                bde_data = df
 
-        # Display filtered data
-        st.subheader('Filtered Data')
-        st.write(filtered_data)
+            if filter_type == 'Date':
+                selected_date_bde = st.date_input('Select Date:')
+                bde_data_filtered = bde_data[bde_data['Activity Date'].dt.date == selected_date_bde]
+            elif filter_type == 'Date Range':
+                start_date_bde = st.date_input('Select Start Date:')
+                end_date_bde = st.date_input('Select End Date:')
+                bde_data_filtered = filter_date_range(bde_data, start_date_bde, end_date_bde)
+            elif filter_type == 'Month':
+                selected_month_bde = st.selectbox('Select Month:', sorted(bde_data['Activity Date'].dt.month.unique()))
+                bde_data_filtered = bde_data[bde_data['Activity Date'].dt.month == selected_month_bde]
+            else:  # 'All Dates'
+                bde_data_filtered = bde_data
 
-        # Display comparison data
-        st.subheader('Comparison Data')
-        st.write(compare_data)
+            # Display BDE data
+            st.subheader(f'Data for {selected_bde if selected_bde != "All" else "All BDEs"}')
+            st.write(bde_data_filtered)
 
-        # Visualizations based on user selection
-        if filtered_data is not None and not filtered_data.empty:
-            selected_columns = st.multiselect('Select Columns for Visualization:', filtered_data.columns)
+            # Visualizations for selected BDE
+            selected_columns_bde = st.multiselect('Select Columns for Visualization:', bde_data_filtered.columns)
 
-            if selected_columns:
-                st.subheader('Visualizations')
-                for column in selected_columns:
+            if selected_columns_bde:
+                st.subheader('BDE Visualizations')
+                for column in selected_columns_bde:
                     # Histogram for numerical columns
-                    if filtered_data[column].dtype != 'object':
+                    if bde_data_filtered[column].dtype != 'object':
                         fig, ax = plt.subplots()
-                        sns.histplot(filtered_data[column], ax=ax)
-                        ax.set_title(f'Histogram of {column}')
+                        sns.histplot(bde_data_filtered[column], ax=ax)
+                        ax.set_title(f'Histogram of {column} for {selected_bde if selected_bde != "All" else "All BDEs"}')
                         st.pyplot(fig)
                     # Bar chart for categorical columns
                     else:
                         fig, ax = plt.subplots()
-                        sns.countplot(data=filtered_data, x=column, ax=ax)
-                        ax.set_title(f'Count of {column}')
+                        sns.countplot(data=bde_data_filtered, x=column, ax=ax)
+                        ax.set_title(f'Count of {column} for {selected_bde if selected_bde != "All" else "All BDEs"}')
                         plt.xticks(rotation=45)
                         st.pyplot(fig)
 
-        # Pie chart to show the number of meetings when comparing two date ranges, dates, or months
-        if compare_data is not None and not compare_data.empty:
-            if filter_type == 'Date' or filter_type == 'Date Range' or filter_type == 'Month':
-                st.subheader('Comparison Pie Chart')
-                fig, ax = plt.subplots()
-                compare_data_count = compare_data.shape[0]
-                labels = ['Filtered Data', 'Comparison Data']
-                sizes = [filtered_data.shape[0], compare_data_count]
-                ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
-                ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-                st.pyplot(fig)
+        elif dashboard_type == 'FPO level Dashboard':
+            st.subheader('FPO Name Dashboard')
+            selected_fpo = st.selectbox('Select FPO Name:', ['All'] + list(df['FPO NAME'].unique()))
+            if selected_fpo != 'All':
+                fpo_data = df[df['FPO NAME'] == selected_fpo]
+            else:
+                fpo_data = df
 
+            if filter_type == 'Date':
+                selected_date_fpo = st.date_input('Select Date:')
+                fpo_data_filtered = fpo_data[fpo_data['Activity Date'].dt.date == selected_date_fpo]
+            elif filter_type == 'Date Range':
+                start_date_fpo = st.date_input('Select Start Date:')
+                end_date_fpo = st.date_input('Select End Date:')
+                fpo_data_filtered = filter_date_range(fpo_data, start_date_fpo, end_date_fpo)
+            elif filter_type == 'Month':
+                selected_month_fpo = st.selectbox('Select Month:', sorted(fpo_data['Activity Date'].dt.month.unique()))
+                fpo_data_filtered = fpo_data[fpo_data['Activity Date'].dt.month == selected_month_fpo]
+            else:  # 'All Dates'
+                fpo_data_filtered = fpo_data
 
-    elif selected_dashboard == 'BDE level Dashboard':
-        st.subheader('BDE Name Dashboard')
-        selected_bde = st.selectbox('Select BDE Name:', df['BDE Name'].unique())
-        bde_data = df[df['BDE Name'] == selected_bde]
+            # Display FPO data
+            st.subheader(f'Data for {selected_fpo if selected_fpo != "All" else "All FPOs"}')
+            st.write(fpo_data_filtered)
 
-        # Filter data by date, date range, or month
-        filter_type_bde = st.radio('Filter Data By:', ('Date', 'Date Range', 'Month', 'All Dates'))
+            # Visualizations for selected FPO
+            selected_columns_fpo = st.multiselect('Select Columns for Visualization:', fpo_data_filtered.columns)
 
-        if filter_type_bde == 'Date':
-            selected_date_bde = st.date_input('Select Date:')
-            bde_data_filtered = bde_data[bde_data['Activity Date'].dt.date == selected_date_bde]
-        elif filter_type_bde == 'Date Range':
-            start_date_bde = st.date_input('Select Start Date:')
-            end_date_bde = st.date_input('Select End Date:')
-            bde_data_filtered = filter_date_range(bde_data, start_date_bde, end_date_bde)
-        elif filter_type_bde == 'Month':
-            selected_month_bde = st.selectbox('Select Month:', sorted(bde_data['Activity Date'].dt.month.unique()))
-            bde_data_filtered = bde_data[bde_data['Activity Date'].dt.month == selected_month_bde]
-        else:
-            bde_data_filtered = bde_data
+            if selected_columns_fpo:
+                st.subheader('FPO Visualizations')
+                for column in selected_columns_fpo:
+                    # Histogram for numerical columns
+                    if fpo_data_filtered[column].dtype != 'object':
+                        fig, ax = plt.subplots()
+                        sns.histplot(fpo_data_filtered[column], ax=ax)
+                        ax.set_title(f'Histogram of {column} for {selected_fpo if selected_fpo != "All" else "All FPOs"}')
+                        st.pyplot(fig)
+                    # Bar chart for categorical columns
+                    else:
+                        fig, ax = plt.subplots()
+                        sns.countplot(data=fpo_data_filtered, x=column, ax=ax)
+                        ax.set_title(f'Count of {column} for {selected_fpo if selected_fpo != "All" else "All FPOs"}')
+                        plt.xticks(rotation=45)
+                        st.pyplot(fig)
 
-        # Display BDE data
-        st.subheader(f'Data for {selected_bde}')
-        st.write(bde_data_filtered)
+        elif dashboard_type == 'Activity level Dashboard':
+            st.subheader('Title of Activity Dashboard')
+            selected_title = st.selectbox('Select Title of Activity:', ['All'] + list(df['Title of Activity'].unique()))
+            if selected_title != 'All':
+                title_data = df[df['Title of Activity'] == selected_title]
+            else:
+                title_data = df
 
-        # Visualizations for selected BDE
-        selected_columns_bde = st.multiselect('Select Columns for Visualization:', bde_data_filtered.columns)
+            if filter_type == 'Date':
+                selected_date_title = st.date_input('Select Date:')
+                title_data_filtered = title_data[title_data['Activity Date'].dt.date == selected_date_title]
+            elif filter_type == 'Date Range':
+                start_date_title = st.date_input('Select Start Date:')
+                end_date_title = st.date_input('Select End Date:')
+                title_data_filtered = filter_date_range(title_data, start_date_title, end_date_title)
+            elif filter_type == 'Month':
+                selected_month_title = st.selectbox('Select Month:', sorted(title_data['Activity Date'].dt.month.unique()))
+                title_data_filtered = title_data[title_data['Activity Date'].dt.month == selected_month_title]
+            else:  # 'All Dates'
+                title_data_filtered = title_data
 
-        if selected_columns_bde:
-            st.subheader('BDE Visualizations')
-            for column in selected_columns_bde:
-                # Histogram for numerical columns
-                if bde_data_filtered[column].dtype != 'object':
-                    fig, ax = plt.subplots()
-                    sns.histplot(bde_data_filtered[column], ax=ax)
-                    ax.set_title(f'Histogram of {column} for {selected_bde}')
-                    st.pyplot(fig)
-                # Bar chart for categorical columns
-                else:
-                    fig, ax = plt.subplots()
-                    sns.countplot(data=bde_data_filtered, x=column, ax=ax)
-                    ax.set_title(f'Count of {column} for {selected_bde}')
-                    plt.xticks(rotation=45)
-                    st.pyplot(fig)
-                    
-    elif selected_dashboard == 'FPO level Dashboard':
-        st.subheader('FPO Name Dashboard')
-        selected_fpo = st.selectbox('Select FPO Name:', df['FPO NAME'].unique())
-        fpo_data = df[df['FPO NAME'] == selected_fpo]
+            # Display Title of Activity data
+            st.subheader(f'Data for "{selected_title if selected_title != "All" else "All Activities"}"')
+            st.write(title_data_filtered)
 
-        # Filter data by date, date range, or month
-        filter_type_fpo = st.radio('Filter Data By:', ('Date', 'Date Range', 'Month', 'All Dates'))
+            # Visualizations for selected Title of Activity
+            selected_columns_title = st.multiselect('Select Columns for Visualization:', title_data_filtered.columns)
 
-        if filter_type_fpo == 'Date':
-            selected_date_fpo = st.date_input('Select Date:')
-            fpo_data_filtered = fpo_data[fpo_data['Activity Date'].dt.date == selected_date_fpo]
-        elif filter_type_fpo == 'Date Range':
-            start_date_fpo = st.date_input('Select Start Date:')
-            end_date_fpo = st.date_input('Select End Date:')
-            fpo_data_filtered = filter_date_range(fpo_data, start_date_fpo, end_date_fpo)
-        elif filter_type_fpo == 'Month':
-            selected_month_fpo = st.selectbox('Select Month:', sorted(fpo_data['Activity Date'].dt.month.unique()))
-            fpo_data_filtered = fpo_data[fpo_data['Activity Date'].dt.month == selected_month_fpo]
-        else:
-            fpo_data_filtered = fpo_data
-
-        # Display FPO data
-        st.subheader(f'Data for {selected_fpo}')
-        st.write(fpo_data_filtered)
-
-        # Visualizations for selected FPO
-        selected_columns_fpo = st.multiselect('Select Columns for Visualization:', fpo_data_filtered.columns)
-
-        if selected_columns_fpo:
-            st.subheader('FPO Visualizations')
-            for column in selected_columns_fpo:
-                # Histogram for numerical columns
-                if fpo_data_filtered[column].dtype != 'object':
-                    fig, ax = plt.subplots()
-                    sns.histplot(fpo_data_filtered[column], ax=ax)
-                    ax.set_title(f'Histogram of {column} for {selected_fpo}')
-                    st.pyplot(fig)
-                # Bar chart for categorical columns
-                else:
-                    fig, ax = plt.subplots()
-                    sns.countplot(data=fpo_data_filtered, x=column, ax=ax)
-                    ax.set_title(f'Count of {column} for {selected_fpo}')
-                    plt.xticks(rotation=45)
-                    st.pyplot(fig)
-                    
-    elif selected_dashboard == 'Activity level Dashboard':
-        st.subheader('Title of Activity Dashboard')
-        selected_title = st.selectbox('Select Title of Activity:', df['Title of Activity'].unique())
-        title_data = df[df['Title of Activity'] == selected_title]
-
-        # Filter data by date, date range, or month
-        filter_type_title = st.radio('Filter Data By:', ('Date', 'Date Range', 'Month', 'All Dates'))
-
-        if filter_type_title == 'Date':
-            selected_date_title = st.date_input('Select Date:')
-            title_data_filtered = title_data[title_data['Activity Date'].dt.date == selected_date_title]
-        elif filter_type_title == 'Date Range':
-            start_date_title = st.date_input('Select Start Date:')
-            end_date_title = st.date_input('Select End Date:')
-            title_data_filtered = filter_date_range(title_data, start_date_title, end_date_title)
-        elif filter_type_title == 'Month':
-            selected_month_title = st.selectbox('Select Month:', sorted(title_data['Activity Date'].dt.month.unique()))
-            title_data_filtered = title_data[title_data['Activity Date'].dt.month == selected_month_title]
-        else:
-            title_data_filtered = title_data
-
-        # Display Title of Activity data
-        st.subheader(f'Data for "{selected_title}"')
-        st.write(title_data_filtered)
-
-        # Visualizations for selected Title of Activity
-        selected_columns_title = st.multiselect('Select Columns for Visualization:', title_data_filtered.columns)
-
-        if selected_columns_title:
-            st.subheader('Title of Activity Visualizations')
-            for column in selected_columns_title:
-                # Histogram for numerical columns
-                if title_data_filtered[column].dtype != 'object':
-                    fig, ax = plt.subplots()
-                    sns.histplot(title_data_filtered[column], ax=ax)
-                    ax.set_title(f'Histogram of {column} for "{selected_title}"')
-                    st.pyplot(fig)
-                # Bar chart for categorical columns
-                else:
-                    fig, ax = plt.subplots()
-                    sns.countplot(data=title_data_filtered, x=column, ax=ax)
-                    ax.set_title(f'Count of {column} for "{selected_title}"')
-                    plt.xticks(rotation=45)
-                    st.pyplot(fig)
-
-
-
+            if selected_columns_title:
+                st.subheader('Title of Activity Visualizations')
+                for column in selected_columns_title:
+                    # Histogram for numerical columns
+                    if title_data_filtered[column].dtype != 'object':
+                        fig, ax = plt.subplots()
+                        sns.histplot(title_data_filtered[column], ax=ax)
+                        ax.set_title(f'Histogram of {column} for "{selected_title if selected_title != "All" else "All Activities"}"')
+                        st.pyplot(fig)
+                    # Bar chart for categorical columns
+                    else:
+                        fig, ax = plt.subplots()
+                        sns.countplot(data=title_data_filtered, x=column, ax=ax)
+                        ax.set_title(f'Count of {column} for "{selected_title if selected_title != "All" else "All Activities"}"')
+                        plt.xticks(rotation=45)
+                        st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
